@@ -1,0 +1,24 @@
+name: VCB Morning Report
+on:
+  schedule:
+    # Chạy lúc 06:00 UTC (8h sáng mùa hè / 7h sáng mùa đông tại Pháp) từ Thứ 2 đến Thứ 6
+    - cron: '0 6 * * 1-5'
+  workflow_dispatch: 
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Cai dat Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          
+      - name: Cai dat thu vien
+        run: |
+          pip install vnstock requests pytz pandas
+          
+      - name: Chay bao cao
+        run: python main.py
