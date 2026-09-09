@@ -1,8 +1,10 @@
-name: VCB Morning Report
+name: VCB Daily Reports (Morning & EOD)
 on:
   schedule:
-    # Chạy lúc 06:00 UTC (8h sáng mùa hè / 7h sáng mùa đông tại Pháp) từ Thứ 2 đến Thứ 6
+    # Chạy lúc 06:00 UTC (8h sáng Pháp) từ Thứ 2 - Thứ 6
     - cron: '0 6 * * 1-5'
+    # Chạy lúc 15:00 UTC (17h chiều Pháp) từ Thứ 2 - Thứ 6
+    - cron: '0 15 * * 1-5'
   workflow_dispatch: 
 
 jobs:
