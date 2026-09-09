@@ -2,7 +2,11 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import pytz
+import time
 from vnstock.api.quote import Quote
+
+# Danh sách 3 mã cổ phiếu bạn muốn theo dõi
+DANH_SACH_MA = ["VCB", "SSI", "MSN"]
 
 # --- CÁC HÀM TÍNH TOÁN ---
 def calculate_rsi(data, window=14):
@@ -12,15 +16,15 @@ def calculate_rsi(data, window=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-def get_stock_data():
+def get_stock_data(symbol):
     tz_vn = pytz.timezone("Asia/Ho_Chi_Minh")
     today_str = datetime.now(tz_vn).strftime("%Y-%m-%d")
     start_str = (datetime.now(tz_vn) - timedelta(days=120)).strftime("%Y-%m-%d")
-    q = Quote(symbol="VCB", source="KBS")
+    q = Quote(symbol=symbol, source="KBS")
     return q.history(start=start_str, end=today_str)
 
 # --- BÁO CÁO SÁNG ---
-def generate_morning_report(df_price):
+def generate_morning_report(df_price, symbol):
     latest = df_price.iloc[-1]
     prev = df_price.iloc[-2]
     close_price = latest["close"]
@@ -30,7 +34,7 @@ def generate_morning_report(df_price):
     now_fr = datetime.now(tz_fr).strftime("%H:%M - %d/%m/%Y")
     
     report = f"""
-🌤 <b>BÁO CÁO VCB SAU PHIÊN SÁNG</b>
+🌤 <b>BÁO CÁO {symbol} SAU PHIÊN SÁNG</b>
 ⏱ Cập nhật: {now_fr} (Giờ Pháp)
 -----------------------------------
 <b>1. GIÁ CỔ PHIẾU (PRICE)</b>
@@ -40,12 +44,11 @@ def generate_morning_report(df_price):
 <b>2. KHỐI LƯỢNG (VOLUME)</b>
 • KL Khớp lệnh: <b>{latest['volume']:,.0f} CP</b>
 -----------------------------------
-<i>🤖 Dữ liệu tạm tính đến giờ nghỉ trưa.</i>
 """
     return report
 
 # --- BÁO CÁO CHIỀU (CHUYÊN SÂU) ---
-def generate_eod_report(df_price):
+def generate_eod_report(df_price, symbol):
     latest = df_price.iloc[-1]
     prev = df_price.iloc[-2]
     
@@ -72,7 +75,7 @@ def generate_eod_report(df_price):
     now_fr = datetime.now(tz_fr).strftime("%d/%m/%Y")
 
     report = f"""
-📊 <b>BÁO CÁO CHUYÊN SÂU VCB | {now_fr}</b>
+📊 <b>BÁO CÁO CHUYÊN SÂU {symbol} | {now_fr}</b>
 -----------------------------------
 <b>1. GIÁ & BIẾN ĐỘNG (PRICE)</b>
 • Đóng cửa: <b>{close_price:,.0f} đ</b> ({change_pct:+.2f}%)
@@ -89,7 +92,6 @@ def generate_eod_report(df_price):
 <b>4. CẢNH BÁO KỸ THUẬT (TECH)</b>
 • Chỉ số RSI (14): {rsi_alert}
 -----------------------------------
-<i>🤖 Chạy tự động chốt phiên cuối ngày.</i>
 """
     return report
 
@@ -102,16 +104,21 @@ def send_telegram(report_content):
     requests.post(url, data=payload)
 
 if __name__ == "__main__":
-    df = get_stock_data()
-    
-    # Lấy giờ hiện tại theo UTC để kiểm tra
     current_utc_hour = datetime.now(pytz.utc).hour
     
-    # Nếu hệ thống chạy trước 10h sáng UTC (tức là mốc 6h UTC - phiên sáng)
-    if current_utc_hour < 10:
-        report_text = generate_morning_report(df)
-    # Nếu hệ thống chạy sau 10h sáng UTC (tức là mốc 15h UTC - phiên chiều)
-    else:
-        report_text = generate_eod_report(df)
-        
-    send_telegram(report_text)
+    # Chạy vòng lặp qua từng mã cổ phiếu
+    for ma_cp in DANH_SACH_MA:
+        try:
+            df = get_stock_data(ma_cp)
+            
+            if current_utc_hour < 10:
+                report_text = generate_morning_report(df, ma_cp)
+            else:
+                report_text = generate_eod_report(df, ma_cp)
+                
+            send_telegram(report_text)
+            
+            # Tạm dừng 3 giây giữa các tin nhắn để Telegram không đánh dấu là Spam
+            time.sleep(3)
+        except Exception as e:
+            send_telegram(f"❌ Lỗi khi lấy dữ liệu mã {ma_cp}: {str(e)}")
